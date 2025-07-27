@@ -1,0 +1,68 @@
+[project]
+name = "weixin_search_mcp"
+version = "0.1.1"
+description = "微信公众号内容搜索和获取工具"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "MIT"
+authors = [
+    {name = "mini"}
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "mcp[cli]>=1.6.0",
+    "fastmcp>=2.10.4",
+    "requests>=2.32.3",
+    "loguru>=0.7.2",
+    "python-dotenv>=1.1.1",
+    "fastapi>=0.110.0",
+    "uvicorn>=0.34.2",
+    "pydantic>=2.0.0",
+    "lxml>=4.9.3"
+]
+
+[project.scripts]
+weixin_search_mcp = "weixin_search_mcp.main:app"
+
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["weixin_search_mcp", "weixin_search_mcp.tools"]
+include-package-data = true
+
+[tool.setuptools.package-data]
+"weixin_search_mcp.tools" = ["*.js"]
+
+[project.optional-dependencies]
+dev = [
+    "build>=1.2.2.post1",
+    "setuptools>=45",
+    "twine>=6.1.0",
+]
+
+[tool.black]
+line-length = 88
+target-version = ["py312"]
+
+[tool.isort]
+profile = "black"
+line_length = 88
+
+[tool.mypy]
+python_version = "3.12"
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+strict_optional = true
+warn_redundant_casts = true
+warn_return_any = true
+warn_unused_ignores = true
+
