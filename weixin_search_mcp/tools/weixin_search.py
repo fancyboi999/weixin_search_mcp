@@ -72,32 +72,26 @@ def sogou_weixin_search(query: Annotated[str, "搜索关键词"], page: int = 1)
         return []
 
 
-def sogou_weixin_search_all(query: str, max_pages: int = 10) -> Dict:
-    """搜索所有页面的结果
+def sogou_weixin_search_all(query: str, max_pages: int = 10) -> List[Dict[str, str]]:
+    """搜索所有页面的结果，自动翻页直到无结果或达到 max_pages
 
     Args:
         query: 搜索关键词
         max_pages: 最大页数，默认10
     Returns:
-        Dict: 包含 total(总数), pages_fetched(实际页数), results(结果列表)
+        List[Dict[str, str]]: 所有页的搜索结果
     """
     all_results = []
-    pages_fetched = 0
     for page in range(1, max_pages + 1):
         results = sogou_weixin_search(query, page=page)
         if not results:
             break
         all_results.extend(results)
-        pages_fetched = page
         # 避免请求过快被限流
         if page < max_pages:
             time.sleep(1)
 
-    return {
-        "total": len(all_results),
-        "pages_fetched": pages_fetched,
-        "results": all_results
-    }
+    return all_results
 
 
 def get_real_url_from_sogou(sogou_url: str) -> str:
