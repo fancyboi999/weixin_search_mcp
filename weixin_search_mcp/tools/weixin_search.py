@@ -62,7 +62,7 @@ def sogou_weixin_search(query: Annotated[str, "搜索关键词"], page: int = 1)
                     'link': link,
                     'real_url': real_url,
                     'publish_time': time_elem.text_content().strip(),
-                    'page': page
+                    'page': str(page)  # str to match Dict[str, str] type signature
                 })
 
             return results

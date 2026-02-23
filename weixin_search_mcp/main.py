@@ -48,7 +48,7 @@ def weixin_search(query: Annotated[str, "搜索关键词"], page: Annotated[int,
     """
     return sogou_weixin_search(query, page=page)
 
-@mcp.tool
+@mcp.tool(output_schema=None)  # results contains list, can't use Dict[str, str]
 def weixin_search_all(query: Annotated[str, "搜索关键词"], max_pages: Annotated[int, "最大页数，默认10"] = 10) -> Dict[str, Any]:
     """搜索所有页面的微信公众号文章（自动翻页）
     Args:
