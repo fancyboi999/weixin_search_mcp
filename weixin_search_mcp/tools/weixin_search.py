@@ -6,8 +6,13 @@ from lxml import html
 from urllib.parse import quote
 import time
 
-def sogou_weixin_search(query: Annotated[str, "搜索关键词"]) -> List[Dict[str, str]]:
-    """在搜狗微信搜索中搜索指定关键词并返回结果列表，包含真实URL"""
+def sogou_weixin_search(query: Annotated[str, "搜索关键词"], page: int = 1) -> List[Dict[str, str]]:
+    """在搜狗微信搜索中搜索指定关键词并返回结果列表，包含真实URL
+
+    Args:
+        query: 搜索关键词
+        page: 页码，默认1
+    """
     headers = {
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
         'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6',
@@ -23,6 +28,7 @@ def sogou_weixin_search(query: Annotated[str, "搜索关键词"]) -> List[Dict[s
         's_from': 'input',
         'query': query,
         'ie': 'utf8',
+        'page': page,
         '_sug_': 'n',
         '_sug_type_': '',
     }
@@ -55,7 +61,8 @@ def sogou_weixin_search(query: Annotated[str, "搜索关键词"]) -> List[Dict[s
                     'title': title,
                     'link': link,
                     'real_url': real_url,
-                    'publish_time': time_elem.text_content().strip()
+                    'publish_time': time_elem.text_content().strip(),
+                    'page': str(page)  # str to match Dict[str, str] type signature
                 })
 
             return results
@@ -63,6 +70,28 @@ def sogou_weixin_search(query: Annotated[str, "搜索关键词"]) -> List[Dict[s
             return []
     except Exception as e:
         return []
+
+
+def sogou_weixin_search_all(query: str, max_pages: int = 10) -> List[Dict[str, str]]:
+    """搜索所有页面的结果，自动翻页直到无结果或达到 max_pages
+
+    Args:
+        query: 搜索关键词
+        max_pages: 最大页数，默认10
+    Returns:
+        List[Dict[str, str]]: 所有页的搜索结果
+    """
+    all_results = []
+    for page in range(1, max_pages + 1):
+        results = sogou_weixin_search(query, page=page)
+        if not results:
+            break
+        all_results.extend(results)
+        # 避免请求过快被限流
+        if page < max_pages:
+            time.sleep(1)
+
+    return all_results
 
 
 def get_real_url_from_sogou(sogou_url: str) -> str:
