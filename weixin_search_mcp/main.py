@@ -35,7 +35,7 @@ parser.add_argument("--host", type=str, default='0.0.0.0')
 
 args = parser.parse_args()
 
-mcp = FastMCP("微信公众号内容获取", port=args.port)
+mcp = FastMCP("微信公众号内容获取")
 
 @mcp.tool
 def weixin_search(query: Annotated[str, "搜索关键词"]) -> List[Dict[str, str]]:
