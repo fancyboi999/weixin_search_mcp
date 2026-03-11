@@ -49,6 +49,12 @@ weixin_search_mcp --transport http --port 8809 --host 0.0.0.0
 weixin_search_mcp --transport stdio
 ```
 
+通过 PyPI / `uvx` 直接运行：
+
+```bash
+uvx --from weixin-search-mcp weixin_search_mcp --transport stdio
+```
+
 ### 4. 配置MCP服务
 
 有两种方式可以配置和启动MCP服务：
@@ -62,7 +68,7 @@ weixin_search_mcp --transport stdio
     "mcpServers": {
         "weixin_search_mcp": {
             "command": "uvx",
-            "args": ["weixin_search_mcp", "--transport", "stdio"]
+            "args": ["--from", "weixin-search-mcp", "weixin_search_mcp", "--transport", "stdio"]
         }
     }
 }
@@ -73,7 +79,7 @@ weixin_search_mcp --transport stdio
 1. 启动HTTP服务：
 
 ```sh
-uvx weixin_search_mcp --transport http --port 8809
+uvx --from weixin-search-mcp weixin_search_mcp --transport http --port 8809
 ```
 
 2. 在Claude配置中添加以下内容：
@@ -95,8 +101,17 @@ uvx weixin_search_mcp --transport http --port 8809
 
 ### 微信搜索工具
 - **weixin_search**: 在搜狗微信搜索中搜索指定关键词并返回结果列表
-  - 参数: `query` - 搜索关键词
-  - 返回: 包含标题、链接、真实URL和发布时间的文章列表
+  - 参数:
+    - `query` - 搜索关键词
+    - `page` - 可选，页码，默认 `1`
+  - 返回: 包含标题、链接、真实URL、发布时间、页码的文章列表
+
+### 多页搜索工具
+- **weixin_search_all**: 自动翻页搜索多页微信公众号文章
+  - 参数:
+    - `query` - 搜索关键词
+    - `max_pages` - 可选，最大页数，默认 `10`
+  - 返回: 聚合后的多页结果列表
 
 ### 内容获取工具
 - **get_weixin_article_content**: 获取微信公众号文章的正文内容
@@ -111,6 +126,18 @@ uvx weixin_search_mcp --transport http --port 8809
 
 ```python
 results = weixin_search("人工智能")
+```
+
+按指定页搜索：
+
+```python
+results = weixin_search("人工智能", page=2)
+```
+
+自动翻页抓取：
+
+```python
+all_results = weixin_search_all("人工智能", max_pages=3)
 ```
 
 2. 获取文章内容:

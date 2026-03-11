@@ -6,7 +6,21 @@ from lxml import html
 from urllib.parse import quote
 import time
 
-def sogou_weixin_search(query: Annotated[str, "搜索关键词"], page: int = 1) -> List[Dict[str, str]]:
+REQUEST_TIMEOUT = 15
+
+
+def _is_antispider_response(response: requests.Response) -> bool:
+    """Detect Sogou anti-spider pages that otherwise look like empty results."""
+    final_url = response.url.lower()
+    body = response.text.lower()
+    return "antispider" in final_url or "seccoderight" in body or "anti.min.css" in body
+
+
+def sogou_weixin_search(
+    query: Annotated[str, "搜索关键词"],
+    page: int = 1,
+    strict: bool = False,
+) -> List[Dict[str, str]]:
     """在搜狗微信搜索中搜索指定关键词并返回结果列表，包含真实URL
 
     Args:
@@ -34,41 +48,59 @@ def sogou_weixin_search(query: Annotated[str, "搜索关键词"], page: int = 1)
     }
 
     try:
-        response = requests.get('https://weixin.sogou.com/weixin', params=params, headers=headers)
+        response = requests.get(
+            'https://weixin.sogou.com/weixin',
+            params=params,
+            headers=headers,
+            timeout=REQUEST_TIMEOUT,
+        )
 
-        if response.status_code == 200:
-            tree = html.fromstring(response.text)
-            results = []
-
-            elements = tree.xpath("//a[contains(@id, 'sogou_vr_11002601_title_')]")
-            publish_time = tree.xpath(
-                "//li[contains(@id, 'sogou_vr_11002601_box_')]/div[@class='txt-box']/div[@class='s-p']/span[@class='s2']")
-
-            for element, time_elem in zip(elements, publish_time):
-                title = element.text_content().strip()
-                link = element.get('href')
-                if link and not link.startswith('http'):
-                    link = 'https://weixin.sogou.com' + link
-                
-                # 获取真实URL
-                real_url = ""
-                try:
-                    real_url = get_real_url_from_sogou(link)
-                except Exception:
-                    pass
-                
-                results.append({
-                    'title': title,
-                    'link': link,
-                    'real_url': real_url,
-                    'publish_time': time_elem.text_content().strip(),
-                    'page': str(page)  # str to match Dict[str, str] type signature
-                })
-
-            return results
-        else:
+        if response.status_code != 200:
+            if strict:
+                raise RuntimeError(f"搜狗微信搜索返回异常状态码: {response.status_code}")
             return []
+
+        if _is_antispider_response(response):
+            if strict:
+                raise RuntimeError("搜狗微信触发反爬验证，分页搜索已中止")
+            return []
+
+        tree = html.fromstring(response.text)
+        results = []
+
+        elements = tree.xpath("//a[contains(@id, 'sogou_vr_11002601_title_')]")
+        publish_time = tree.xpath(
+            "//li[contains(@id, 'sogou_vr_11002601_box_')]/div[@class='txt-box']/div[@class='s-p']/span[@class='s2']")
+
+        for element, time_elem in zip(elements, publish_time):
+            title = element.text_content().strip()
+            link = element.get('href')
+            if link and not link.startswith('http'):
+                link = 'https://weixin.sogou.com' + link
+
+            # 获取真实URL
+            real_url = ""
+            try:
+                real_url = get_real_url_from_sogou(link)
+            except Exception:
+                pass
+
+            results.append({
+                'title': title,
+                'link': link,
+                'real_url': real_url,
+                'publish_time': time_elem.text_content().strip(),
+                'page': str(page)  # str to match Dict[str, str] type signature
+            })
+
+        return results
+    except requests.RequestException as e:
+        if strict:
+            raise RuntimeError(f"请求搜狗微信搜索失败: {str(e)}") from e
+        return []
     except Exception as e:
+        if strict:
+            raise RuntimeError(f"解析搜狗微信搜索结果失败: {str(e)}") from e
         return []
 
 
@@ -83,7 +115,7 @@ def sogou_weixin_search_all(query: str, max_pages: int = 10) -> List[Dict[str, s
     """
     all_results = []
     for page in range(1, max_pages + 1):
-        results = sogou_weixin_search(query, page=page)
+        results = sogou_weixin_search(query, page=page, strict=True)
         if not results:
             break
         all_results.extend(results)
@@ -107,7 +139,10 @@ def get_real_url_from_sogou(sogou_url: str) -> str:
     }
 
     try:
-        response = requests.get(sogou_url, headers=headers)
+        response = requests.get(sogou_url, headers=headers, timeout=REQUEST_TIMEOUT)
+
+        if _is_antispider_response(response):
+            return ""
 
         script_content = response.text
         start_index = script_content.find("url += '") + len("url += '")
@@ -122,6 +157,8 @@ def get_real_url_from_sogou(sogou_url: str) -> str:
             start_index = part_end + 1
 
         full_url = ''.join(url_parts).replace("@", "")
+        if not full_url:
+            return ""
         return "https://mp." + full_url
     except Exception as e:
         return ""
@@ -155,7 +192,11 @@ def get_article_content(real_url: Annotated[str, "真实微信公众号文章链
         headers.pop('referer')
 
     try:
-        response = requests.get(real_url, headers=headers)
+        if not real_url or real_url == "https://mp.":
+            return "获取文章内容失败: 未拿到有效的微信公众号文章链接"
+
+        response = requests.get(real_url, headers=headers, timeout=REQUEST_TIMEOUT)
+        response.raise_for_status()
         tree = html.fromstring(response.text)
         content_elements = tree.xpath("//div[@id='js_content']//text()")
         cleaned_content = [text.strip() for text in content_elements if text.strip()]

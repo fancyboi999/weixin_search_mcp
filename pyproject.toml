@@ -1,6 +1,6 @@
 [project]
 name = "weixin_search_mcp"
-version = "0.1.1"
+version = "0.2.1"
 description = "微信公众号内容搜索和获取工具"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -65,4 +65,3 @@ strict_optional = true
 warn_redundant_casts = true
 warn_return_any = true
 warn_unused_ignores = true
-
