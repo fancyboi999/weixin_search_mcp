@@ -1,6 +1,23 @@
 # 微信公众号内容搜索工具 (Weixin Search MCP)
 
-这是一个基于MCP (Multimodal Capability Provider)的工具，用于搜索和获取微信公众号文章内容。通过搜狗微信搜索接口，可以方便地获取公众号文章并提取内容。
+这是一个基于 MCP (Model Context Protocol) 的工具，用于搜索和获取微信公众号文章内容。通过搜狗微信搜索接口，可以方便地获取公众号文章并提取内容。
+
+<p align="center">
+  <a href="media/weixin-search-mcp-promo.mp4">
+    <img src="media/weixin-search-mcp-promo.gif" alt="weixin_search_mcp 演示" width="720">
+  </a>
+  <br>
+  <em>▶️ 点击查看带打字声 + 配乐的高清 MP4（45s）</em>
+</p>
+
+<!--
+  想在 README 里直接内嵌「带声音的播放器」？GitHub 上唯一的办法：
+  1. 打开本仓库任意 issue / PR 评论框（或 Releases 编辑页）
+  2. 把 media/weixin-search-mcp-promo.mp4 拖进去，等它上传生成一个
+     https://github.com/user-attachments/assets/xxxx 链接
+  3. 把那串链接单独一行粘进这里，GitHub 会自动渲染成带声音的播放器
+  （提交进仓库的 mp4 用 <video> 标签会被 GitHub 过滤，不渲染，所以才要这一步）
+-->
 
 ## 功能特点
 

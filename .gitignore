@@ -12,3 +12,4 @@ static/
 .idea
 
 .env
+.video-build/
