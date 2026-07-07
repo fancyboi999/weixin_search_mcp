@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/fancyboi999-weixin-search-mcp-badge.png)](https://mseep.ai/app/fancyboi999-weixin-search-mcp)
+
 # 微信公众号内容搜索工具 (Weixin Search MCP)
 
 这是一个基于 MCP (Model Context Protocol) 的工具，用于搜索和获取微信公众号文章内容。通过搜狗微信搜索接口，可以方便地获取公众号文章并提取内容。
