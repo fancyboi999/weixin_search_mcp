@@ -31,5 +31,8 @@ jobs:
       - name: Smoke test module import
         run: .venv/bin/python -c "from weixin_search_mcp.main import app; print('import ok')"
 
+      - name: Run tests
+        run: .venv/bin/python -m unittest discover -s tests -v
+
       - name: Build distribution
         run: .venv/bin/python -m build

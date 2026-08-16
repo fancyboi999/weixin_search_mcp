@@ -27,13 +27,20 @@ def setup_logger(log_level="INFO"):
 
 setup_logger(log_level="INFO")
 
+
+def configure_stdio_utf8() -> None:
+    """Ensure MCP stdio messages and logs are encoded as UTF-8."""
+    for stream in (sys.stdin, sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            reconfigure(encoding="utf-8")
+
+
 parser = argparse.ArgumentParser()
 
 parser.add_argument("--transport", type=str, default='http')
 parser.add_argument("--port", type=int, default=8809)
 parser.add_argument("--host", type=str, default='0.0.0.0')
-
-args = parser.parse_args()
 
 mcp = FastMCP("微信公众号内容获取")
 
@@ -71,6 +78,7 @@ def get_weixin_article_content(real_url: Annotated[str, "真实微信公众号�
     return get_article_content(real_url, referer)
 
 def app():
+    args = parser.parse_args()
     host = args.host
     port = args.port
     transport = args.transport
@@ -78,7 +86,8 @@ def app():
         if transport == "http":
             mcp.run(host=host, port=port, transport=transport)
         elif transport == "stdio":
-            mcp.run(transport=transport)
+            configure_stdio_utf8()
+            mcp.run(transport=transport, show_banner=False)
         else:
             raise ValueError("不支持的端口形式")
     except KeyboardInterrupt:
