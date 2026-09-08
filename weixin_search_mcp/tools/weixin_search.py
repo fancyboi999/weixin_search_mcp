@@ -1,4 +1,7 @@
 import json
+import os
+import re
+import datetime
 import asyncio
 from typing import Annotated, Any, Dict, List, Optional
 import requests
@@ -7,6 +10,35 @@ from urllib.parse import quote
 import time
 
 REQUEST_TIMEOUT = 15
+
+_UA = ('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+       '(KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36 Edg/137.0.0.0')
+
+# 搜狗把「跳转链」与发起搜索的会话绑定：解析真链必须复用同一 Session 的新鲜 cookie，
+# 用另一个连接（或一份写死的旧 cookie）去请求跳转链只会拿到空结果。
+_SESSION = requests.Session()
+
+# 默认忽略 HTTP_PROXY/HTTPS_PROXY：常见代理的出口 IP 会被搜狗直接判为反爬，
+# 表现为搜索恒返回空。确实需要经代理访问搜狗的用户可设 WEIXIN_SEARCH_TRUST_ENV=1 恢复。
+_SESSION.trust_env = os.environ.get('WEIXIN_SEARCH_TRUST_ENV', '').lower() in ('1', 'true', 'yes')
+_SESSION.headers.update({'User-Agent': _UA})
+
+
+def _warmup():
+    """访问一次首页，换取本次会话的新鲜 cookie。"""
+    if not _SESSION.cookies:
+        try:
+            _SESSION.get('https://weixin.sogou.com/', timeout=REQUEST_TIMEOUT)
+        except requests.RequestException:
+            pass
+
+
+def _readable_time(raw: str) -> str:
+    """搜狗把发布时间塞在未执行的 JS 里：document.write(timeConvert('1788797730'))"""
+    m = re.search(r"timeConvert\('(\d+)'\)", raw or '')
+    if not m:
+        return (raw or '').strip()
+    return datetime.datetime.fromtimestamp(int(m.group(1))).strftime('%Y-%m-%d %H:%M')
 
 
 def _is_antispider_response(response: requests.Response) -> bool:
@@ -34,7 +66,6 @@ def sogou_weixin_search(
         'Connection': 'keep-alive',
         'Pragma': 'no-cache',
         'Referer': f'https://weixin.sogou.com/weixin?query={quote(query)}',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36 Edg/137.0.0.0',
     }
 
     params = {
@@ -47,23 +78,22 @@ def sogou_weixin_search(
         '_sug_type_': '',
     }
 
+    _warmup()
+
     try:
-        response = requests.get(
+        response = _SESSION.get(
             'https://weixin.sogou.com/weixin',
             params=params,
             headers=headers,
             timeout=REQUEST_TIMEOUT,
         )
 
+        # 失败一律抛错：静默返回 [] 会让调用方把「被反爬拦截」误读成「该关键词没有文章」。
         if response.status_code != 200:
-            if strict:
-                raise RuntimeError(f"搜狗微信搜索返回异常状态码: {response.status_code}")
-            return []
+            raise RuntimeError(f"搜狗微信搜索返回异常状态码: {response.status_code}")
 
         if _is_antispider_response(response):
-            if strict:
-                raise RuntimeError("搜狗微信触发反爬验证，分页搜索已中止")
-            return []
+            raise RuntimeError("搜狗微信触发反爬验证：请降低频率或稍后重试（这不代表没有搜索结果）")
 
         tree = html.fromstring(response.text)
         results = []
@@ -89,11 +119,14 @@ def sogou_weixin_search(
                 'title': title,
                 'link': link,
                 'real_url': real_url,
-                'publish_time': time_elem.text_content().strip(),
+                'publish_time': _readable_time(time_elem.text_content()),
                 'page': str(page)  # str to match Dict[str, str] type signature
             })
 
         return results
+    except RuntimeError:
+        # 反爬拦截 / 异常状态码：必须向上传递，否则会被误读成「没有搜索结果」。
+        raise
     except requests.RequestException as e:
         if strict:
             raise RuntimeError(f"请求搜狗微信搜索失败: {str(e)}") from e
@@ -129,17 +162,13 @@ def sogou_weixin_search_all(query: str, max_pages: int = 10) -> List[Dict[str, s
 def get_real_url_from_sogou(sogou_url: str) -> str:
     """从搜狗微信链接获取真实的微信公众号文章链接"""
     headers = {
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
-        'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6',
-        'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive',
-        'Pragma': 'no-cache',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36 Edg/137.0.0.0',
-        'Cookie': 'ABTEST=7|1750756616|v1; SUID=0A5BF4788E52A20B00000000685A6D08; IPLOC=CN1100; SUID=605BF4783954A20B00000000685A6D08; SUV=006817F578F45BFE685A6D0B913DA642; SNUID=B3E34CC0B8BF80F5737E3561B9B78454; ariaDefaultTheme=undefined',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+        'Referer': 'https://weixin.sogou.com/',
     }
 
     try:
-        response = requests.get(sogou_url, headers=headers, timeout=REQUEST_TIMEOUT)
+        response = _SESSION.get(sogou_url, headers=headers, timeout=REQUEST_TIMEOUT)
 
         if _is_antispider_response(response):
             return ""
@@ -195,7 +224,7 @@ def get_article_content(real_url: Annotated[str, "真实微信公众号文章链
         if not real_url or real_url == "https://mp.":
             return "获取文章内容失败: 未拿到有效的微信公众号文章链接"
 
-        response = requests.get(real_url, headers=headers, timeout=REQUEST_TIMEOUT)
+        response = _SESSION.get(real_url, headers=headers, timeout=REQUEST_TIMEOUT)
         response.raise_for_status()
         tree = html.fromstring(response.text)
         content_elements = tree.xpath("//div[@id='js_content']//text()")
